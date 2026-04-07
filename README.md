@@ -10,7 +10,7 @@ A starter template for building plugins for Dynamic Island WPF.
 ## Setup
 
 1. Clone this repository
-2. Download `PluginContract.dll` from [Releases](https://github.com/pempemk/DynamicOverlay-plugin-template/releases) and place it in `lib/`
+2. Download `PluginContract.dll` from [Releases](https://github.com/pempemk/DynamicOverlay-plugin/releases) and place it in `lib/`
 3. Rename the project to match your plugin name (both the `.csproj` filename and the namespace inside it)
 4. Edit `MyPlugin.cs`
 5. Build
@@ -28,4 +28,4 @@ Copy the build output into `Plugins/<YourPluginName>/` and run the app.
 
 ## Further reading
 
-See the full [Plugin Development Guide](https://github.com/pempemk/DynamicOverlay-plugin-template/blob/main/plugin-development.md) for details on layout modes, permissions, networking, and Steam Workshop publishing.
+See the full [Plugin Development Guide](https://github.com/pempemk/DynamicOverlay-plugin/blob/main/plugin-development.md) for details on layout modes, permissions, networking, and Steam Workshop publishing.
