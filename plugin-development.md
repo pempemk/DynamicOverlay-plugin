@@ -8,7 +8,7 @@ A guide for developers who want to build plugins for Dynamic Island WPF.
 
 - .NET 9 SDK
 - Visual Studio 2022, Rider, or VS Code
-- `PluginContract.dll` — download from [Releases](https://github.com/pempemk/DynamicOverlay-plugin-template/releases)
+- `PluginContract.dll` — download from [Releases](https://github.com/pempemk/DynamicOverlay-plugin/releases)
 
 ---
 
@@ -278,4 +278,4 @@ When a user subscribes, Steam downloads the plugin and the app copies it into `P
 
 ## Template Project
 
-Download the starter template at [DynamicOverlay-plugin-template](https://github.com/pempemk/DynamicOverlay-plugin-template)
+Download the starter template at [DynamicOverlay-plugin-template](https://github.com/pempemk/DynamicOverlay-plugin)
