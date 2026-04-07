@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows10.0.17763.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <!--
+      MyPlugin → Plugins/MyPlugin/MyPlugin.dll
+    -->
+    <AssemblyName>MyPlugin</AssemblyName>
+    <RootNamespace>MyPlugin</RootNamespace>
+    <!--
+      If the plugin has additional DLL dependencies,
+enable CopyLocalLockFileAssemblies to copy them during the build.
+    -->
+    <!-- <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Download PluginContract.dll from the main repository's Releases section.
+Then place it in the lib/ folder.
+    -->
+    <Reference Include="PluginContract">
+      <HintPath>lib\PluginContract.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
