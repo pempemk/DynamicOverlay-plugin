@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Everything a plugin needs: the IPlugin contract + build targets that
+         pack manifest.json + plugin.dll + ui/ into a .dop on every build. -->
+    <PackageReference Include="DynamicOverlay.Sdk" Version="0.1.0" />
+  </ItemGroup>
+
+</Project>

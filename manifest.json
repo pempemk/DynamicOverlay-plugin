@@ -1,0 +1,15 @@
+{
+  "id":          "com.yourname.myplugin",
+  "name":        "My Plugin",
+  "version":     "1.0.0",
+  "entryPoint":  "plugin.dll",
+  "ui":          "ui/index.html",
+  "icon":        "ui/icon.png",
+  "permissions": [],
+
+  "settings": [
+    { "key": "caption",     "label": "Caption",        "type": "text",   "default": "Count" },
+    { "key": "step",        "label": "Increment step", "type": "number", "default": 1, "min": 1, "max": 100 },
+    { "key": "showButtons", "label": "Show buttons",   "type": "toggle", "default": true }
+  ]
+}

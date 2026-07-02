@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    /* The tile sits on a translucent overlay bar — keep the body transparent
+       and design for a small surface (roughly 16:10, scales with the bar). */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: transparent;
+      color: #fff;
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .wrap { display: flex; flex-direction: column; align-items: center; gap: 0.35em; }
+
+    #count {
+      font-size: clamp(1.2rem, 5vw, 2.4rem);
+      font-weight: 300;
+      text-shadow: 0 1px 4px rgba(0,0,0,.4);
+    }
+
+    .btns { display: flex; gap: 0.4em; }
+    button {
+      font-size: clamp(0.5rem, 2vw, 0.75rem);
+      background: rgba(255,255,255,0.12);
+      border: none;
+      border-radius: 4px;
+      color: rgba(255,255,255,0.75);
+      padding: 0.25em 0.6em;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(255,255,255,0.22); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="caption" style="font-size:clamp(0.5rem,1.7vw,0.7rem);opacity:0.55;letter-spacing:0.06em;">Count</div>
+    <div id="count">0</div>
+    <div class="btns" id="btns">
+      <button id="bInc">+1</button>
+      <button id="bReset">reset</button>
+      <button id="bNotify" title="show an overlay notification">🔔</button>
+    </div>
+  </div>
+
+  <script>
+    const countEl = document.getElementById('count');
+
+    // ── User settings ──────────────────────────────────────────────────────
+    // Declared in manifest.json under "settings"; the host renders a form in the
+    // plugin Settings dialog and delivers the chosen values here. Read once on load.
+    let step = 1;
+    (async () => {
+      try {
+        const cfg = await pluginApi.getConfig();
+        const s = (cfg && cfg.settings) || {};
+        if (typeof s.caption === 'string') document.getElementById('caption').textContent = s.caption;
+        if (typeof s.step === 'number') step = s.step;
+        if (s.showButtons === false) document.getElementById('btns').style.display = 'none';
+      } catch {}
+    })();
+
+    // ── UI → C# ────────────────────────────────────────────────────────────
+    // pluginApi.sendMessage(action, payload) reaches Plugin.OnMessage in C#.
+    document.getElementById('bInc')
+      .addEventListener('click', () => pluginApi.sendMessage('increment', String(step)));
+    document.getElementById('bReset')
+      .addEventListener('click', () => pluginApi.sendMessage('reset', null));
+
+    // ── C# → UI ────────────────────────────────────────────────────────────
+    // _ctx.SendToUI(action, payload) in C# arrives here as a 'pluginMessage'
+    // window event with { action, payload } in e.detail.
+    window.addEventListener('pluginMessage', e => {
+      const { action, payload } = e.detail ?? {};
+      if (action === 'countChanged') countEl.textContent = payload;
+    });
+
+    // ── Other pluginApi calls (all return Promises) ────────────────────────
+    // pluginApi.notify(message)         overlay notification pill (single arg —
+    //                                   the title is your plugin's name)
+    // pluginApi.getData(key) /
+    //   .setData(key, value)            per-tile key-value store
+    // pluginApi.getConfig()             { name, version, description, settings } from manifest
+    // pluginApi.request(url, opts)      HTTP fetch  — needs "network" permission
+    // pluginApi.getSystemInfo()         CPU/RAM     — needs "system" permission
+    // pluginApi.getMedia()/controlMedia(a)  now-playing — needs "media" permission
+    // pluginApi.getVolume()/setVolume(o)    volume      — needs "audio" permission
+    document.getElementById('bNotify')
+      .addEventListener('click', () => pluginApi.notify('Hello from My Plugin!'));
+  </script>
+</body>
+</html>
