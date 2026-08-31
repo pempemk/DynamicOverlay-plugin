@@ -110,8 +110,33 @@ Declare options and the host renders a form in your plugin's **Settings** dialog
 | `color` | color swatch + hex box | hex string like `"#FF8800"` | |
 | `multiselect` | checkbox list | array of the checked strings | `options` |
 | `search` | search box with live suggestions | the picked item as a whole object | `sourceUrl`, `itemsPath`, `labelKey`, `subLabelKey` |
+| `hotkey` | key-combination picker | `{ mods, vk, label }` | see below — the host binds it for you |
 
-App versions older than the one that introduced a type render it as a toggle, so prefer the four basic types (`toggle`, `number`, `text`, `select`) unless you need more.
+#### `hotkey`: a global shortcut, bound for you
+
+Declare a setting of type `hotkey` and the host binds that combination system-wide. You do not register anything and you need no permission — when it fires, a `hotkey` event arrives naming the **setting key**, and you decide what it means:
+
+```json
+{ "key": "hkRefresh", "label": "Refresh now", "type": "hotkey",
+  "default": { "mods": 0, "vk": 116, "label": "F5" } }
+```
+
+```js
+window.addEventListener('hotkey', e => {
+  if (e.detail.key === 'hkRefresh') refresh();
+});
+```
+
+To let the user rebind it from inside your own UI, read the new combination with `captureHotkey()` and write it back with `setSetting()`. The binding follows the stored value, so your UI and the Settings dialog stay in sync:
+
+```js
+const hk = await pluginApi.captureHotkey();          // null on Escape/timeout
+if (hk) await pluginApi.setSetting('hkRefresh', hk); // pass the whole object
+```
+
+Limit: **8 bound hotkeys per plugin**; anything past the eighth is ignored.
+
+Two plugins may bind the same combination — both fire. The key also still reaches the focused app.
 
 #### Common fields (any type)
 
@@ -217,14 +242,43 @@ window.addEventListener('pluginMessage', e => {
 
 All calls return Promises and reject with a readable error on failure or a missing permission. Default call timeout: 10 s.
 
+`pluginApi.hasFeature(name)` reports whether this host knows an API. An older host ignores an option it does not understand and times out on a call it does not have, so guard anything newer than the app version you target:
+
+```js
+if (pluginApi.hasFeature('setOverlayStatus')) pluginApi.setOverlayStatus({ color: '#4a9eff', text: 'Syncing' });
+```
+
 ### Core (no permission needed)
 
 | Call | Does |
 |---|---|
 | `sendMessage(action, payload)` | Deliver to your C# `OnMessage`. |
-| `notify(message)` | Overlay notification pill. One argument; the title is your plugin's name. Rate-limited to 5 per 10 s. |
-| `getData(key)` / `setData(key, value)` | Per-tile in-memory key-value store. Limits: 256 keys, 256 KB per value. Cleared when the tile is removed, so use C# plus `storage` for real persistence. |
+| `notify(message, opts?)` | Overlay notification pill. `opts` takes `title` and `color`; the default title is your plugin's name. Rate-limited to 5 per 10 s. |
+| `getData(key)` / `setData(key, value)` | Per-tile in-memory key-value store. Limits: 256 keys, 256 KB per value. Cleared when the tile is removed. |
 | `getConfig()` | `{ name, version, settings }` from your manifest. `settings` holds the user's chosen values. |
+| `setSetting(key, value)` | Write back one of your own declared settings. Same store the Settings dialog edits, so an in-plugin settings UI stays in sync with it. |
+| `getLayout()` | `'full'` \| `'half'` \| `'third'` — the current slot. Pure JS, no round-trip, so it is safe to call often. |
+| `setOverlayStatus({ color, text })` | Tint the **collapsed** overlay bar and put a short label on it, for reporting progress while your tile is not visible. Resolves `false` if another plugin already holds it. Pass `null` to release when you are done. |
+
+### Files (no permission needed)
+
+The user picks the location through a system dialog. Your plugin passes and receives file **contents only, never a path**, and there is no API to reopen a previously used file.
+
+```js
+const r = await pluginApi.saveFile(JSON.stringify(data), { name: 'export', ext: '.mydata' });
+// { ok, name }   ok:false also covers the user cancelling
+
+const text = await pluginApi.openFile({ ext: '.mydata' });              // contents as a string
+const f    = await pluginApi.openFile({ ext: '.mydata', withName: true }); // { name, text }
+```
+
+`name` is the file name only — never a folder, never a full path.
+
+### Persistent storage (needs `storage`)
+
+| Call | Does |
+|---|---|
+| `getStore(key)` / `setStore(key, value)` / `removeStore(key)` | Disk-backed JSON that survives the tile being removed, the overlay reloading, and the app restarting. Use this instead of `setData` for anything that must outlive the session. |
 
 ### Network (needs `network`)
 
@@ -251,8 +305,35 @@ const res = await pluginApi.request('https://api.example.com/data', {
 | `controlMedia(action)` | `media` | `action` is one of `play`, `pause`, `playpause`, `next`, `previous` |
 | `getVolume()` | `audio` | `{ volume, mute }` |
 | `setVolume({ volume?, mute? })` | `audio` | Set either or both |
+| `getAudioSessions()` | `audio` | Per-app volume/mute, one entry per sounding app |
+| `setAudioSession(pid, { volume?, mute? })` | `audio` | Set one app's volume/mute |
+| `getMicState()` | `microphone` | `{ mute }` — current mute state |
+| `setMicMute(mute)` | `microphone` | Mute/unmute the default capture device |
 | `getBluetoothDevices()` | `bluetooth` | Paired devices (with battery where available) |
 | `getHidDevices()` | `hid` | USB/HID peripherals |
+
+### Input (each gated by its permission)
+
+| Call | Needs | Returns |
+|---|---|---|
+| `readInput(cb, opts)` | `input-read` | `{ stop() }`. `cb` fires once per event. Stops collecting at 200,000 events without an error. |
+| `sendInput(events, opts)` | `input-send` | `{ id, pause(), resume(), stop() }`. The event shape from `readInput` goes straight back in. |
+| `captureHotkey(timeoutMs?)` | — | `{ mods, vk, label }`, or `null` on Escape or timeout. Default 10 s. |
+
+`readInput` options: `keyboard`, `mouse` (both default `true`), `mouseMoveHz` (default `100`), `onStop` (the host ended it).
+
+`sendInput` options: `loops` (`0` repeats until stopped), `speed` (divides every recorded delay, clamped 0–100, default `1`), `onLoop(n)` (loops finished, throttled), `onDone` (a finite run ending on its own — a stop you asked for does not call it).
+
+```js
+const events = [];
+const recorder = await pluginApi.readInput(ev => events.push(ev));
+await recorder.stop();
+
+const playback = await pluginApi.sendInput(events, { loops: 2, speed: 1 });
+await playback.pause();   // held keys are released, then pressed again on resume
+await playback.resume();
+await playback.stop();
+```
 
 ### OAuth (needs `oauth`)
 
@@ -270,7 +351,7 @@ Declare in `manifest.json`. The user sees this list in the approval dialog when 
 | String | Grants |
 |---|---|
 | `network` | Outbound HTTP for `request()` in the UI |
-| `storage` | A private writable folder (`GetStoragePath()` in C#) |
+| `storage` | Persistent storage — `getStore`/`setStore` in the UI, `GetStoragePath()` in C# |
 | `system` | CPU / RAM info |
 | `audio` | Read and set system volume |
 | `media` | Now-playing info and transport control |
@@ -279,6 +360,12 @@ Declare in `manifest.json`. The user sees this list in the approval dialog when 
 | `hid` | Enumerate USB/HID peripherals |
 | `local-network` | Lets `request()` reach localhost and the private LAN (local companion apps, Ollama, Home Assistant) |
 | `oauth` | Host-mediated sign-in to external accounts |
+| `input-read` | Watch every keystroke and mouse action (`readInput`) |
+| `input-send` | Synthesise keystrokes and mouse actions (`sendInput`) |
+
+Declare only what you use — the user reads this list before enabling your plugin.
+
+`saveFile`, `openFile` and `captureHotkey` are not in this table: they need no permission.
 
 ## 9. OAuth provider config (advanced)
 
@@ -312,7 +399,18 @@ With the `oauth` permission, declare providers in the manifest:
 
 The host sets the current layout as `data-layout` on `<html>` and fires a `layoutchange` window event whenever it changes, so your CSS can adapt: `:root[data-layout="third"] .meta { display: none; }`
 - Bundle CSS, JS, and images inside `ui/`. Fetch binary data through `request({ responseType: 'base64' })`.
-- JS timers (`setInterval`) work normally.
+- **JS timers are throttled while the overlay is collapsed.** Your tile is a Chromium page: once hidden, `setInterval` runs about once per second, and after five minutes hidden about once per minute, whatever interval you set. Shortening the interval does not help.
+
+  Derive elapsed time from the clock rather than counting ticks, so a late tick still shows the right value:
+
+  ```js
+  // loses time whenever a tick is deferred
+  setInterval(() => { seconds += 1; }, 1000);
+  // a late tick jumps to the correct value
+  setInterval(() => { render(Date.now() - startedAt); }, 1000);
+  ```
+
+  To show progress while collapsed, use `setOverlayStatus()` instead of redrawing the tile.
 
 ## 11. Test locally and publish
 
